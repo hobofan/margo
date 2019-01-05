@@ -4,21 +4,21 @@ use hyper_tls::HttpsConnector;
 use std::sync::Arc;
 use std::sync::RwLock;
 
-use super::{Error, Future, LinkResolver};
+use super::{Error, Future, SourceResolver};
 use crate::helpers::follow_get;
 use crate::Crate;
 
 #[derive(Clone)]
-pub struct RemoteRegistryLinkResolver {
+pub struct RemoteRegistrySourceResolver {
     remote_registry_url: String,
-    client: Client<HttpsConnector<HttpConnector>, hyper::Body>,
+    client: Arc<Client<HttpsConnector<HttpConnector>, hyper::Body>>,
     cached_registry_dl_url: Arc<RwLock<Option<String>>>,
 }
 
-impl RemoteRegistryLinkResolver {
+impl RemoteRegistrySourceResolver {
     pub fn new(remote_registry_url: &str) -> Self {
         let https = HttpsConnector::new(4).expect("TLS initialization failed");
-        let client = Client::builder().build::<_, hyper::Body>(https);
+        let client = Arc::new(Client::builder().build::<_, hyper::Body>(https));
 
         Self {
             remote_registry_url: remote_registry_url.to_owned(),
@@ -35,14 +35,10 @@ impl RemoteRegistryLinkResolver {
         let client2 = self.client.clone();
         let cached_registry_dl_url = self.cached_registry_dl_url.clone();
         futures::future::lazy(move || {
-            println!("HERE2");
-
             let is_cached = { cached_registry_dl_url.read().unwrap().is_some() };
-            println!("CACHED: {:?}", is_cached);
             match is_cached {
                 false => futures::future::Either::A(
                     follow_get(&client2, registry_config_url).and_then(move |body: String| {
-                        println!("HERE3");
                         let content: serde_json::Value = serde_json::from_str(&body).unwrap();
                         let registry_dl_url: String =
                             content.get("dl").unwrap().as_str().unwrap().to_owned();
@@ -90,7 +86,6 @@ impl RemoteRegistryLinkResolver {
 
             registry_dl_url
                 .and_then(move |registry_dl_url| {
-                    println!("HERE4");
                     resolver.resolve_crate_download_link(&_crate, registry_dl_url)
                 })
                 .map_err(|_| ())
@@ -99,17 +94,17 @@ impl RemoteRegistryLinkResolver {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct RemoteRegistryLinkResolverFuture {
+pub struct RemoteRegistrySourceResolverFuture {
     inner: Future<String>,
 }
 
-impl RemoteRegistryLinkResolverFuture {
+impl RemoteRegistrySourceResolverFuture {
     fn new(fut: Future<String>) -> Self {
         Self { inner: fut }
     }
 }
 
-impl StdFuture for RemoteRegistryLinkResolverFuture {
+impl StdFuture for RemoteRegistrySourceResolverFuture {
     type Item = String;
     type Error = ();
 
@@ -118,10 +113,10 @@ impl StdFuture for RemoteRegistryLinkResolverFuture {
     }
 }
 
-impl LinkResolver for RemoteRegistryLinkResolver {
-    type F = RemoteRegistryLinkResolverFuture;
+impl SourceResolver for RemoteRegistrySourceResolver {
+    type F = RemoteRegistrySourceResolverFuture;
 
     fn resolve_crate(&self, _crate: &Crate) -> Self::F {
-        RemoteRegistryLinkResolverFuture::new(Box::new(self.resolve_crate(_crate.clone())))
+        RemoteRegistrySourceResolverFuture::new(Box::new(self.resolve_crate(_crate.clone())))
     }
 }

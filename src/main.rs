@@ -1,19 +1,23 @@
 #[macro_use]
 extern crate serde_derive;
 
+mod downloader;
 mod helpers;
-mod link_resolver;
+mod source_resolver;
 
 use futures::future::Future;
 use futures::stream::Stream;
+use log::{debug, trace};
 use regex::Regex;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::link_resolver::LinkResolver;
+use crate::downloader::Downloader;
+use crate::source_resolver::SourceResolver;
 
 #[derive(Deserialize, Debug)]
 pub struct CargoLockfile {
@@ -138,8 +142,6 @@ fn main() {
 
     let lockfile: CargoLockfile = toml::de::from_slice(&buffer).unwrap();
 
-    println!("{:?}", lockfile.fetchable_crates());
-
     let cargo_dir = Path::new("/Users/hobofan/.cargo/");
     // HACK: fixed for now, assuming that it will stay the same
     let registry_name = "github.com-1ecc6299db9ec823";
@@ -158,7 +160,6 @@ fn main() {
         } else {
             unfetched_crates += 1;
         }
-        println!("{:?} : {:?}", cache_path, cache_path.exists());
     }
 
     println!(
@@ -170,39 +171,26 @@ fn main() {
 
     // TODO
     let remote_registry_url = "https://github.com/rust-lang/crates.io-index";
-    let link_resolver = crate::link_resolver::RemoteRegistryLinkResolver::new(remote_registry_url);
+    let source_resolver =
+        crate::source_resolver::RemoteRegistrySourceResolver::new(remote_registry_url);
 
-    let client = Arc::new(reqwest::Client::new());
     let fetch_stream = futures::stream::futures_ordered(
         crate_download_targets.into_iter().map(futures::future::ok),
     )
-    .filter(|cargo_crate| {
-        println!("ABC: {:?}", !cargo_crate.target_path().exists());
-        !cargo_crate.target_path().exists()
-    })
+    .filter(|cargo_crate| !cargo_crate.target_path().exists())
     .and_then(|fetchable_crate| {
-        println!("THERE");
-        let client2 = client.clone();
-        LinkResolver::resolve_crate(&link_resolver, &fetchable_crate.cargo_crate()).and_then(
+        SourceResolver::resolve_crate(&source_resolver, &fetchable_crate.cargo_crate()).and_then(
             move |crate_dl_url| {
-                let mut dl_dest = File::create(fetchable_crate.target_path()).unwrap();
-
-                println!("DL URL: {:?}", crate_dl_url);
-                client2
-                    .get(reqwest::Url::parse(&crate_dl_url).unwrap())
-                    .send()
-                    .unwrap()
-                    .copy_to(&mut dl_dest)
-                    .unwrap();
-                println!("FINISHED DL URL: {:?}", crate_dl_url);
-
-                Ok(())
+                let downloader = crate::downloader::SimpleReqwestDownloader::new();
+                downloader.checked_download(
+                    &crate_dl_url,
+                    &fetchable_crate.target_path(),
+                    fetchable_crate.cargo_crate().checksum.as_ref().unwrap(),
+                )
             },
         )
     })
     .collect();
-    // .collect();
-    // let fetch_stream = fetch_futures);
 
     eloop
         .run(fetch_stream.and_then(|_| Ok(())).map_err(|_| ()))
