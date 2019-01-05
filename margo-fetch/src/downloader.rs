@@ -10,8 +10,11 @@ use std::path::Path;
 type Error = ();
 
 #[allow(dead_code)]
+#[cfg(feature = "std")]
 type Future<T> = Box<dyn StdFuture<Item = T, Error = Error> + Send>;
 
+// TODO: find an alternative to path, so it is also usable with no_std
+#[cfg(feature = "std")]
 pub trait Downloader {
     type F: StdFuture<Item = (), Error = ()> + Send;
 

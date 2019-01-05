@@ -7,8 +7,10 @@ use futures::future::Future as StdFuture;
 
 use crate::Crate;
 
+#[allow(dead_code)]
 type Error = ();
 
+#[allow(dead_code)]
 type Future<T> = Box<dyn StdFuture<Item = T, Error = Error> + Send>;
 
 pub trait SourceResolver {

@@ -7,10 +7,11 @@ edition = "2018"
 [dependencies]
 # core
 serde_derive = "1.0.82"
-serde = "1.0.82"
-regex = "1.1.0"
+serde = { version = "1.0.82", default-features = false }
 log = "0.4.6"
 futures = "0.1.25"
+# std
+regex = { version = "1.1.0", optional = true }
 # downloader_checksum
 hex = { version = "0.3.2", optional = true }
 sha2 = { version = "0.8.0", optional = true }
@@ -22,7 +23,8 @@ hyper-tls = { version = "0.3.1", optional = true }
 serde_json = { version = "1.0.34", optional = true }
 
 [features]
-default = ["downloader_checksum"]
+default = ["downloader_checksum", "std"]
+std = ["serde/std", "regex"]
 
 downloader_checksum = ["sha2", "hex"]
 downloader_simple_reqwest = ["downloader_checksum", "reqwest"]

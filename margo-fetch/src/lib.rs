@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
 #[macro_use]
 extern crate serde_derive;
 
@@ -5,23 +7,29 @@ pub mod downloader;
 mod helpers;
 pub mod source_resolver;
 
+#[cfg(feature = "std")]
 use regex::Regex;
+#[cfg(feature = "std")]
 use std::collections::HashMap;
+#[cfg(feature = "std")]
 use std::path::{Path, PathBuf};
 
 #[derive(Deserialize, Debug)]
+#[cfg(feature = "std")]
 pub struct CargoLockfile {
     metadata: HashMap<String, String>,
 }
 
 impl CargoLockfile {
+    #[cfg(feature = "std")]
     pub fn crates(&self) -> Vec<Crate> {
         self.metadata
             .iter()
-            .map(|(crate_part, checksum)| Crate::from_parts(crate_part, checksum))
+            .map(|(crate_part, checksum)| Crate::parse_from_parts(crate_part, checksum))
             .collect()
     }
 
+    #[cfg(feature = "std")]
     pub fn fetchable_crates(&self) -> Vec<Crate> {
         self.crates()
             .into_iter()
@@ -40,7 +48,8 @@ pub struct Crate {
 }
 
 impl Crate {
-    pub fn from_parts(crate_part: &str, checksum: &str) -> Self {
+    #[cfg(feature = "std")]
+    pub fn parse_from_parts(crate_part: &str, checksum: &str) -> Self {
         let regex = Regex::new(r"(?m)checksum (.+) (.+) \((.+)\)").unwrap();
         let caps = regex.captures(crate_part).unwrap();
 
@@ -61,6 +70,7 @@ impl Crate {
     }
 }
 
+#[cfg(feature = "std")]
 pub trait CrateDownloadTarget {
     fn crate_name(&self) -> &str;
     fn version(&self) -> &str;
@@ -69,6 +79,7 @@ pub trait CrateDownloadTarget {
     fn target_path(&self) -> PathBuf;
 }
 
+#[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct CargoCacheCrate<'a> {
     _crate: &'a Crate,
@@ -76,6 +87,7 @@ pub struct CargoCacheCrate<'a> {
     registry_name: &'a str,
 }
 
+#[cfg(feature = "std")]
 impl<'a> CargoCacheCrate<'a> {
     pub fn new(_crate: &'a Crate, cargo_dir: &'a Path, registry_name: &'a str) -> Self {
         Self {
@@ -105,6 +117,7 @@ impl<'a> CargoCacheCrate<'a> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> CrateDownloadTarget for CargoCacheCrate<'a> {
     fn crate_name(&self) -> &str {
         &self._crate.crate_name
