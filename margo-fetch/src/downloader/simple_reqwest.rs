@@ -1,7 +1,7 @@
 use log::{debug, trace};
-use sha2::{Digest, Sha256};
 use std::path::Path;
 
+use super::checksum::verify_checksum;
 use super::{Downloader, Future};
 
 pub struct SimpleReqwestDownloader {
@@ -20,8 +20,6 @@ impl Downloader for SimpleReqwestDownloader {
     type F = Future<()>;
 
     fn checked_download(&self, download_url: &str, target_path: &Path, checksum: &str) -> Self::F {
-        let mut hasher = Sha256::new();
-
         debug!("DL URL: {:?}", download_url);
         let mut dl_res = self
             .client
@@ -32,11 +30,7 @@ impl Downloader for SimpleReqwestDownloader {
         dl_res.copy_to(&mut buffer).unwrap();
         debug!("FINISHED DL URL: {:?}", download_url);
 
-        std::io::copy(&mut buffer.as_slice(), &mut hasher).unwrap();
-        let calculated_checksum = hex::encode(hasher.result());
-        trace!("CALCULATED CHECKSUM: {:?}", calculated_checksum);
-        trace!("EXPECTED CHECKSUM: {:?}", checksum);
-        let checksums_match = &calculated_checksum == checksum;
+        let checksums_match = verify_checksum(&mut buffer.as_slice(), checksum);
         trace!("CHECKSUM matches: {:?}", checksums_match);
         if !checksums_match {
             return Box::new(futures::future::err(()));

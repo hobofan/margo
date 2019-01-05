@@ -1,0 +1,12 @@
+[package]
+name = "margo-fetch-bin"
+version = "0.1.0"
+authors = ["Maximilian Goisser <goisser94@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+margo-fetch = { path = "../margo-fetch", features = ["downloader_simple_reqwest", "source_resolver_remote_registry"] }
+toml = "0.4.10"
+futures = "0.1.25"
+tokio-core = "0.1.17"
+env_logger = "0.6.0"
