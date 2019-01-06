@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "std")]
 pub mod downloader;
 mod helpers;
 pub mod source_resolver;
@@ -20,6 +21,7 @@ pub struct CargoLockfile {
     metadata: HashMap<String, String>,
 }
 
+#[cfg(feature = "std")]
 impl CargoLockfile {
     #[cfg(feature = "std")]
     pub fn crates(&self) -> Vec<Crate> {
@@ -40,26 +42,51 @@ impl CargoLockfile {
 }
 
 #[derive(Debug, Clone)]
-pub struct Crate {
-    pub crate_name: String,
-    pub version: String,
-    pub source: String,
-    pub checksum: Option<String>,
+pub struct Crate<'a, 'b, 'c, 'd> {
+    pub crate_name: &'a str,
+    pub version: &'b str,
+    pub source: &'c str,
+    pub checksum: Option<&'d str>,
 }
 
-impl Crate {
+impl<'a, 'b, 'c, 'd> Crate<'a, 'b, 'c, 'd> {
+    pub fn new(
+        crate_name: &'a str,
+        version: &'b str,
+        source: &'c str,
+        checksum: Option<&'d str>,
+    ) -> Self {
+        Crate {
+            crate_name,
+            version,
+            source,
+            checksum,
+        }
+    }
+
     #[cfg(feature = "std")]
-    pub fn parse_from_parts(crate_part: &str, checksum: &str) -> Self {
+    pub fn to_owned(&self) -> CrateOwned {
+        CrateOwned {
+            crate_name: self.crate_name.to_owned(),
+            version: self.version.to_owned(),
+            source: self.source.to_owned(),
+            checksum: self.checksum.map(|n| n.to_owned()),
+        }
+    }
+
+    // `std` feature because regex requires std
+    #[cfg(feature = "std")]
+    pub fn parse_from_parts<'cp: 'a + 'b + 'c>(crate_part: &'cp str, checksum: &'d str) -> Self {
         let regex = Regex::new(r"(?m)checksum (.+) (.+) \((.+)\)").unwrap();
         let caps = regex.captures(crate_part).unwrap();
 
-        let crate_name = caps.get(1).unwrap().as_str().to_owned();
-        let version = caps.get(2).unwrap().as_str().to_owned();
-        let source = caps.get(3).unwrap().as_str().to_owned();
+        let crate_name = caps.get(1).unwrap().as_str();
+        let version = caps.get(2).unwrap().as_str();
+        let source = caps.get(3).unwrap().as_str();
 
         let checksum = match checksum {
             "<none>" => None,
-            other => Some(other.to_owned()),
+            other => Some(other),
         };
         Self {
             crate_name,
@@ -67,6 +94,27 @@ impl Crate {
             source,
             checksum,
         }
+    }
+}
+
+#[cfg(feature = "std")]
+#[derive(Debug, Clone)]
+pub struct CrateOwned {
+    pub crate_name: String,
+    pub version: String,
+    pub source: String,
+    pub checksum: Option<String>,
+}
+
+#[cfg(feature = "std")]
+impl CrateOwned {
+    pub fn as_ref(&self) -> Crate {
+        Crate::new(
+            &self.crate_name,
+            &self.version,
+            &self.source,
+            self.checksum.as_ref().map(|n| n.as_ref()),
+        )
     }
 }
 
@@ -82,14 +130,14 @@ pub trait CrateDownloadTarget {
 #[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct CargoCacheCrate<'a> {
-    _crate: &'a Crate,
+    _crate: Crate<'a, 'a, 'a, 'a>,
     cargo_dir: &'a Path,
     registry_name: &'a str,
 }
 
 #[cfg(feature = "std")]
 impl<'a> CargoCacheCrate<'a> {
-    pub fn new(_crate: &'a Crate, cargo_dir: &'a Path, registry_name: &'a str) -> Self {
+    pub fn new(_crate: Crate<'a, 'a, 'a, 'a>, cargo_dir: &'a Path, registry_name: &'a str) -> Self {
         Self {
             _crate,
             cargo_dir,

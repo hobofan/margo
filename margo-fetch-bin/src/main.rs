@@ -24,8 +24,8 @@ fn main() {
     let registry_name = "github.com-1ecc6299db9ec823";
     let fetchable_crates: Vec<_> = lockfile.fetchable_crates();
     let crate_download_targets: Vec<_> = fetchable_crates
-        .iter()
-        .map(|n| CargoCacheCrate::new(&n, &cargo_dir, registry_name))
+        .into_iter()
+        .map(|n| CargoCacheCrate::new(n, &cargo_dir, registry_name))
         .collect();
 
     let mut fetched_crates = 0;

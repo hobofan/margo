@@ -5,8 +5,12 @@ use std::sync::Arc;
 use std::sync::RwLock;
 
 use self::helpers::follow_get;
-use super::{Error, Future, SourceResolver};
-use crate::Crate;
+use super::SourceResolver;
+use crate::{Crate, CrateOwned};
+
+type Error = ();
+
+type Future<T> = Box<dyn StdFuture<Item = T, Error = Error> + Send>;
 
 #[derive(Clone)]
 pub struct RemoteRegistrySourceResolver {
@@ -67,7 +71,7 @@ impl RemoteRegistrySourceResolver {
 
     pub fn resolve_crate_download_link(
         &self,
-        _crate: &Crate,
+        _crate: &CrateOwned,
         registry_dl_url: String,
     ) -> Future<String> {
         Box::new(futures::future::ok(format!(
@@ -78,7 +82,7 @@ impl RemoteRegistrySourceResolver {
 
     pub fn resolve_crate(
         &self,
-        _crate: Crate,
+        _crate: CrateOwned,
     ) -> impl StdFuture<Item = String, Error = Error> + Send {
         let resolver = self.clone();
         futures::future::lazy(|| {
@@ -113,11 +117,11 @@ impl StdFuture for RemoteRegistrySourceResolverFuture {
     }
 }
 
-impl SourceResolver for RemoteRegistrySourceResolver {
+impl SourceResolver<String> for RemoteRegistrySourceResolver {
     type F = RemoteRegistrySourceResolverFuture;
 
     fn resolve_crate(&self, _crate: &Crate) -> Self::F {
-        RemoteRegistrySourceResolverFuture::new(Box::new(self.resolve_crate(_crate.clone())))
+        RemoteRegistrySourceResolverFuture::new(Box::new(self.resolve_crate(_crate.to_owned())))
     }
 }
 

@@ -22,10 +22,13 @@ pub trait Downloader {
 }
 
 #[cfg(feature = "downloader_checksum")]
+pub use self::checksum::verify_checksum;
+#[cfg(feature = "downloader_checksum")]
 pub mod checksum {
     use log::trace;
     use sha2::{Digest, Sha256};
 
+    /// Helper to verify the checksum of a download.
     pub fn verify_checksum<R: std::io::Read>(input: &mut R, checksum: &str) -> bool {
         let mut hasher = Sha256::new();
 
