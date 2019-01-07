@@ -22,7 +22,7 @@ fn main() {
     let cargo_dir = Path::new("/Users/hobofan/.cargo/");
     // HACK: fixed for now, assuming that it will stay the same
     let registry_name = "github.com-1ecc6299db9ec823";
-    let fetchable_crates: Vec<_> = lockfile.fetchable_crates();
+    let fetchable_crates: Vec<_> = lockfile.fetchable_crates().collect();
     let crate_download_targets: Vec<_> = fetchable_crates
         .into_iter()
         .map(|n| CargoCacheCrate::new(n, &cargo_dir, registry_name))

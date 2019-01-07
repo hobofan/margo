@@ -23,22 +23,24 @@ pub struct CargoLockfile {
 
 #[cfg(feature = "std")]
 impl CargoLockfile {
-    #[cfg(feature = "std")]
-    pub fn crates(&self) -> Vec<Crate> {
-        self.metadata
-            .iter()
-            .map(|(crate_part, checksum)| Crate::parse_from_parts(crate_part, checksum))
-            .collect()
+    pub fn crates(&self) -> impl Iterator<Item = Crate> {
+        extract_metadata_crates(self.metadata.iter().map(|(k, v)| (k.as_ref(), v.as_ref())))
     }
 
-    #[cfg(feature = "std")]
-    pub fn fetchable_crates(&self) -> Vec<Crate> {
+    pub fn fetchable_crates(&self) -> impl Iterator<Item = Crate> {
         self.crates()
             .into_iter()
             .filter(|n| n.checksum.is_some())
             .filter(|n| n.source == "registry+https://github.com/rust-lang/crates.io-index")
-            .collect()
     }
+}
+
+#[cfg(feature = "std")]
+/// Extract all from a K/V-iterator which yields the [metadata] section of a Cargo.lock
+pub fn extract_metadata_crates<'a, I: Iterator<Item = (&'a str, &'a str)>>(
+    metadata: I,
+) -> impl Iterator<Item = Crate<'a, 'a, 'a, 'a>> {
+    metadata.map(|(crate_part, checksum)| Crate::parse_from_parts(crate_part, checksum))
 }
 
 #[derive(Debug, Clone)]
